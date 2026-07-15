@@ -104,14 +104,11 @@ void BuildHuffmanTree(string inputText, const string& outputFileName, priority_q
     GenerateHuffmanCodes(priorityQueue.top(), "", huffmanCodeMap); ///< Generates Huffman codes starting from the root of the tree.
 
     ofstream codeFile(outputFileName + ".huff");
-    for (auto pair : huffmanCodeMap)
-    {
-        if (pair.first == '\n')
-            codeFile << "\\n" << ":" << pair.second << endl; ///< Writes newline character as "\n" in the Huffman code file.
-        else
-            codeFile << pair.first << ":" << pair.second << endl; ///< Writes other characters and their codes to the Huffman code file.
-    }
-    codeFile.close(); ///< Closes the Huffman code file.
+    // Symbols are stored as numeric byte values so that any byte,
+    // including ':' and control characters, survives the text format.
+    for (const auto& pair : huffmanCodeMap)
+        codeFile << static_cast<int>(static_cast<unsigned char>(pair.first)) << ":" << pair.second << "\n";
+    codeFile.close();
 
     string encodedString;
     for (char ch : inputText) encodedString += huffmanCodeMap[ch]; ///< Encodes the input text using the generated Huffman codes.
@@ -183,18 +180,29 @@ void DecodeFile(const string& encodedFileName, const string& huffFileName, const
     string line;
     unordered_map<string, char> huffmanCodes;
     while (getline(codeFile, line)) {
-        if (!line.empty()) {
-            string symbol = line.substr(0, line.find(':')); ///< Extracts the character symbol from the line.
-            string code = line.substr(line.find(':') + 1); ///< Extracts the Huffman code from the line.
-            if (symbol == "\\n") {
-                huffmanCodes[code] = '\n'; ///< Handles newline characters specially.
-            }
-            else {
-                huffmanCodes[code] = symbol[0]; ///< Maps the Huffman code to its corresponding character.
-            }
-        }
+        if (line.empty())
+            continue;
+
+        // Expected line format: <byte value 0..255>:<code made of '0'/'1'>.
+        // Lines that do not match are skipped instead of producing garbage entries.
+        size_t separator = line.find(':');
+        if (separator == string::npos || separator == 0 || separator > 3)
+            continue;
+
+        string valuePart = line.substr(0, separator);
+        string code = line.substr(separator + 1);
+        if (valuePart.find_first_not_of("0123456789") != string::npos)
+            continue;
+        if (code.empty() || code.find_first_not_of("01") != string::npos)
+            continue;
+
+        int value = stoi(valuePart);
+        if (value > 255)
+            continue;
+
+        huffmanCodes[code] = static_cast<char>(value);
     }
-    codeFile.close(); ///< Closes the Huffman code file.
+    codeFile.close();
 
     ofstream outputFile(outputFileName);
     DecodeBinaryFile(encodedFileName, outputFile, huffmanCodes); ///< Decodes the binary file and writes the output to a file.
