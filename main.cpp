@@ -50,7 +50,9 @@ void GenerateHuffmanCodes(TreeNode* root, string str, unordered_map<char, string
         return; ///< Base case: if the root is null, do nothing.
 
     if (!root->left && !root->right)
-        huffmanCodes[root->character] = str; ///< If this is a leaf node, assign the code generated so far to this character.
+        // A single-symbol alphabet makes the root itself a leaf, so its path
+        // is empty; such a symbol still needs a real code to be decodable.
+        huffmanCodes[root->character] = str.empty() ? "0" : str;
 
     GenerateHuffmanCodes(root->left, str + "0", huffmanCodes); ///< Recursively traverse the left child, appending "0" to the code string.
     GenerateHuffmanCodes(root->right, str + "1", huffmanCodes); ///< Recursively traverse the right child, appending "1" to the code string.
@@ -85,7 +87,13 @@ void BuildHuffmanTree(string inputText, const string& outputFileName, priority_q
     for (char ch : inputText)
         charFrequencyMap[ch]++;
 
-    charFrequencyMap['\n']++;
+    // An empty input has no alphabet to build a tree from; emit an empty
+    // table and a header-only stream so decompression restores an empty file.
+    if (charFrequencyMap.empty()) {
+        ofstream codeFile(outputFileName + ".huff");
+        WriteEncodedStringToFile("", outputFileName);
+        return;
+    }
 
     for (auto pair : charFrequencyMap)
         priorityQueue.push(new TreeNode(pair.first, pair.second));
