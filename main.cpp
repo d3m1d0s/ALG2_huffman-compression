@@ -61,8 +61,13 @@ void GenerateHuffmanCodes(TreeNode* root, string str, unordered_map<char, string
 /// @brief Writes the encoded string to a binary file.
 /// @param encodedString The string of encoded data.
 /// @param outputFileName The name of the file to write the encoded data to.
-void WriteEncodedStringToFile(const string& encodedString, const string& outputFileName) {
+/// @returns True on success, false if the output file cannot be created.
+bool WriteEncodedStringToFile(const string& encodedString, const string& outputFileName) {
     ofstream outputFile(outputFileName, ios::binary);
+    if (!outputFile.is_open()) {
+        cerr << "Error: cannot create the output file: " << outputFileName << endl;
+        return false;
+    }
 
     // The first byte of the file stores how many filler zero bits
     // were appended to complete the last data byte (0..7).
@@ -75,13 +80,15 @@ void WriteEncodedStringToFile(const string& encodedString, const string& outputF
         outputFile.put(static_cast<char>(bitset<8>(byteBits).to_ulong()));
     }
     outputFile.close();
+    return true;
 }
 
 /// @brief Builds the Huffman tree from the input text.
 /// @param inputText The text to be encoded.
 /// @param outputFileName The name of the file to store the Huffman codes.
 /// @param priorityQueue The priority queue to construct the Huffman tree.
-void BuildHuffmanTree(string inputText, const string& outputFileName, priority_queue<TreeNode*, vector<TreeNode*>, CompareNodes>& priorityQueue)
+/// @returns True on success, false if an output file cannot be created.
+bool BuildHuffmanTree(string inputText, const string& outputFileName, priority_queue<TreeNode*, vector<TreeNode*>, CompareNodes>& priorityQueue)
 {
     unordered_map<char, unsigned> charFrequencyMap;
     for (char ch : inputText)
@@ -91,8 +98,11 @@ void BuildHuffmanTree(string inputText, const string& outputFileName, priority_q
     // table and a header-only stream so decompression restores an empty file.
     if (charFrequencyMap.empty()) {
         ofstream codeFile(outputFileName + ".huff");
-        WriteEncodedStringToFile("", outputFileName);
-        return;
+        if (!codeFile.is_open()) {
+            cerr << "Error: cannot create the code table: " << outputFileName << ".huff" << endl;
+            return false;
+        }
+        return WriteEncodedStringToFile("", outputFileName);
     }
 
     for (auto pair : charFrequencyMap)
@@ -112,6 +122,10 @@ void BuildHuffmanTree(string inputText, const string& outputFileName, priority_q
     GenerateHuffmanCodes(priorityQueue.top(), "", huffmanCodeMap); ///< Generates Huffman codes starting from the root of the tree.
 
     ofstream codeFile(outputFileName + ".huff");
+    if (!codeFile.is_open()) {
+        cerr << "Error: cannot create the code table: " << outputFileName << ".huff" << endl;
+        return false;
+    }
     // Symbols are stored as numeric byte values so that any byte,
     // including ':' and control characters, survives the text format.
     for (const auto& pair : huffmanCodeMap)
@@ -121,18 +135,24 @@ void BuildHuffmanTree(string inputText, const string& outputFileName, priority_q
     string encodedString;
     for (char ch : inputText) encodedString += huffmanCodeMap[ch]; ///< Encodes the input text using the generated Huffman codes.
 
-    WriteEncodedStringToFile(encodedString, outputFileName); ///< Writes the encoded string to a binary file.
+    return WriteEncodedStringToFile(encodedString, outputFileName);
 }
 
-/// @brief Reads and returns the contents of a file as a string.
+/// @brief Reads the contents of a file into a string.
 /// @param fileName The name of the file to read.
-/// @returns The contents of the file as a string.
-string ReadFile(const string& fileName) {
+/// @param content Receives the contents of the file.
+/// @returns True on success, false if the file cannot be opened.
+bool ReadFile(const string& fileName, string& content) {
     ifstream file(fileName);
+    if (!file.is_open()) {
+        cerr << "Error: cannot open the input file: " << fileName << endl;
+        return false;
+    }
     stringstream buffer;
-    buffer << file.rdbuf(); ///< Reads the entire contents of the file into a string buffer.
-    file.close(); ///< Closes the file stream.
-    return buffer.str(); ///< Returns the contents of the file as a string.
+    buffer << file.rdbuf();
+    file.close();
+    content = buffer.str();
+    return true;
 }
 
 /// @brief Decodes the encoded string.
@@ -183,8 +203,13 @@ void DecodeBinaryFile(const string& encodedFileName, ofstream& outputFile, const
 /// @param encodedFileName The name of the file containing encoded data.
 /// @param huffFileName The name of the file containing Huffman codes.
 /// @param outputFileName The name of the file to write the decoded data.
-void DecodeFile(const string& encodedFileName, const string& huffFileName, const string& outputFileName) {
+/// @returns True on success, false if any of the files cannot be used.
+bool DecodeFile(const string& encodedFileName, const string& huffFileName, const string& outputFileName) {
     ifstream codeFile(huffFileName);
+    if (!codeFile.is_open()) {
+        cerr << "Error: cannot open the code table: " << huffFileName << endl;
+        return false;
+    }
     string line;
     unordered_map<string, char> huffmanCodes;
     while (getline(codeFile, line)) {
@@ -212,41 +237,65 @@ void DecodeFile(const string& encodedFileName, const string& huffFileName, const
     }
     codeFile.close();
 
+    if (!fs::exists(encodedFileName)) {
+        cerr << "Error: cannot open the compressed file: " << encodedFileName << endl;
+        return false;
+    }
+    // An empty table is only legitimate for the stream of an empty original
+    // file, which consists of the single padding-size byte.
+    if (huffmanCodes.empty() && fs::file_size(encodedFileName) > 1) {
+        cerr << "Error: no valid entries in the code table: " << huffFileName << endl;
+        return false;
+    }
+
     ofstream outputFile(outputFileName);
-    DecodeBinaryFile(encodedFileName, outputFile, huffmanCodes); ///< Decodes the binary file and writes the output to a file.
-    outputFile.close(); ///< Closes the output file stream.
+    if (!outputFile.is_open()) {
+        cerr << "Error: cannot create the output file: " << outputFileName << endl;
+        return false;
+    }
+    DecodeBinaryFile(encodedFileName, outputFile, huffmanCodes);
+    outputFile.close();
+    return true;
 }
 
 /// @brief Calculates and displays the file size before and after compression.
 /// @param inputFileName The name of the input file.
 /// @param outputFileName The name of the output file.
 void FileSizeCompress(const string& inputFileName, const string& outputFileName) {
-    auto inputSize = fs::file_size(inputFileName); ///< Gets the size of the input file in bytes.
-    auto outputSize = fs::file_size(outputFileName); ///< Gets the size of the output file in bytes.
+    if (!fs::exists(inputFileName) || !fs::exists(outputFileName))
+        return;
+
+    auto inputSize = fs::file_size(inputFileName);
+    auto outputSize = fs::file_size(outputFileName);
 
     cout << "Compression completed!" << endl;
+    cout << "Original Size: " << inputSize << " bytes\n";
+    cout << "Compressed Size: " << outputSize << " bytes\n";
 
-    cout << "Original Size: " << inputSize << " bytes\n"; ///< Displays the original file size.
-    cout << "Compressed Size: " << outputSize << " bytes\n"; ///< Displays the compressed file size.
-
-    double compressionPercent = 100.0 * (1 - (double)outputSize / inputSize); ///< Calculates the compression percentage.
-    cout << "Compression Percentage: " << compressionPercent << "%\n"; ///< Displays the compression percentage.
+    if (inputSize > 0) {
+        double compressionPercent = 100.0 * (1 - (double)outputSize / inputSize);
+        cout << "Compression Percentage: " << compressionPercent << "%\n";
+    }
 }
 
 /// @brief Calculates and displays the file size before and after decompression.
 /// @param inputFileName The name of the compressed input file.
 /// @param outputFileName The name of the decompressed output file.
 void FileSizeDecompress(const string& inputFileName, const string& outputFileName) {
-    auto inputSize = fs::file_size(inputFileName); ///< Gets the size of the compressed file in bytes.
-    auto outputSize = fs::file_size(outputFileName); ///< Gets the size of the decompressed file in bytes.
+    if (!fs::exists(inputFileName) || !fs::exists(outputFileName))
+        return;
+
+    auto inputSize = fs::file_size(inputFileName);
+    auto outputSize = fs::file_size(outputFileName);
 
     cout << "Decompression completed!" << endl;
+    cout << "Compressed Size: " << inputSize << " bytes\n";
+    cout << "Decompressed Size: " << outputSize << " bytes\n";
 
-    cout << "Compressed Size: " << inputSize << " bytes\n"; ///< Displays the compressed file size.
-    cout << "Decompressed Size: " << outputSize << " bytes\n"; ///< Displays the decompressed file size.
-
-    double decompressionIncreasePercent = 100.0 * ((double)outputSize / inputSize - 1); ///< Calculates the decompression increase percentage.
-    cout << "Decompression Increase Percentage: " << decompressionIncreasePercent << "%\n"; ///< Displays the decompression increase percentage.
+    if (inputSize > 0) {
+        double decompressionIncreasePercent = 100.0 * ((double)outputSize / inputSize - 1);
+        cout << "Decompression Increase Percentage: " << decompressionIncreasePercent << "%\n";
+    }
 }
 
 /// @brief The main function handling command line arguments for compressing or decompressing files.
@@ -264,14 +313,18 @@ int main(int argc, char* argv[]) {
     string outputFileName = argv[3]; ///< Stores the name of the output file.
 
     if (action == "c") {
-        string text = ReadFile(inputFileName); ///< Reads the input file.
-        priority_queue<TreeNode*, vector<TreeNode*>, CompareNodes> pq; ///< Creates a priority queue for building the Huffman tree.
-        BuildHuffmanTree(text, outputFileName, pq); ///< Builds the Huffman tree and encodes the file.
-        FileSizeCompress(inputFileName, outputFileName); ///< Displays the file size before and after compression.
+        string text;
+        if (!ReadFile(inputFileName, text))
+            return 1;
+        priority_queue<TreeNode*, vector<TreeNode*>, CompareNodes> pq;
+        if (!BuildHuffmanTree(text, outputFileName, pq))
+            return 1;
+        FileSizeCompress(inputFileName, outputFileName);
     }
     else if (action == "d") {
-        DecodeFile(inputFileName, inputFileName + ".huff", outputFileName); ///< Decodes the file.
-        FileSizeDecompress(inputFileName, outputFileName); ///< Displays the file size before and after decompression.
+        if (!DecodeFile(inputFileName, inputFileName + ".huff", outputFileName))
+            return 1;
+        FileSizeDecompress(inputFileName, outputFileName);
     }
     else {
         cerr << "Invalid action. Use 'c' for compress and 'd' for decompress." << endl; ///< Handles invalid actions.
