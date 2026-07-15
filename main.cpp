@@ -43,7 +43,7 @@ struct CompareNodes
 /// @param root Pointer to the root of the Huffman tree.
 /// @param str A string representing the path to the current node.
 /// @param huffmanCodes A map to store characters and their corresponding Huffman codes.
-void GenerateHuffmanCodes(TreeNode* root, string str, unordered_map<char, string>& huffmanCodes)
+void GenerateHuffmanCodes(TreeNode* root, const string& str, unordered_map<char, string>& huffmanCodes)
 {
     if (root == nullptr)
         return; ///< Base case: if the root is null, do nothing.
@@ -54,6 +54,17 @@ void GenerateHuffmanCodes(TreeNode* root, string str, unordered_map<char, string
 
     GenerateHuffmanCodes(root->left, str + "0", huffmanCodes); ///< Recursively traverse the left child, appending "0" to the code string.
     GenerateHuffmanCodes(root->right, str + "1", huffmanCodes); ///< Recursively traverse the right child, appending "1" to the code string.
+}
+
+/// @brief Frees all nodes of a Huffman tree.
+/// @param root Pointer to the root of the tree.
+void FreeHuffmanTree(TreeNode* root)
+{
+    if (root == nullptr)
+        return;
+    FreeHuffmanTree(root->left);
+    FreeHuffmanTree(root->right);
+    delete root;
 }
 
 /// @brief Writes the encoded string to a binary file.
@@ -83,9 +94,8 @@ bool WriteEncodedStringToFile(const string& encodedString, const string& outputF
 /// @brief Builds the Huffman tree from the input text.
 /// @param inputText The text to be encoded.
 /// @param outputFileName The name of the file to store the Huffman codes.
-/// @param priorityQueue The priority queue to construct the Huffman tree.
 /// @returns True on success, false if an output file cannot be created.
-bool BuildHuffmanTree(string inputText, const string& outputFileName, priority_queue<TreeNode*, vector<TreeNode*>, CompareNodes>& priorityQueue)
+bool BuildHuffmanTree(const string& inputText, const string& outputFileName)
 {
     unordered_map<char, unsigned> charFrequencyMap;
     for (char ch : inputText)
@@ -101,7 +111,8 @@ bool BuildHuffmanTree(string inputText, const string& outputFileName, priority_q
         return WriteEncodedStringToFile("", outputFileName);
     }
 
-    for (auto pair : charFrequencyMap)
+    priority_queue<TreeNode*, vector<TreeNode*>, CompareNodes> priorityQueue;
+    for (const auto& pair : charFrequencyMap)
         priorityQueue.push(new TreeNode(pair.first, pair.second));
 
     while (priorityQueue.size() != 1)
@@ -114,12 +125,14 @@ bool BuildHuffmanTree(string inputText, const string& outputFileName, priority_q
         priorityQueue.push(parentNode); ///< Pushes the parent node back into the priority queue.
     }
 
+    TreeNode* root = priorityQueue.top();
     unordered_map<char, string> huffmanCodeMap;
-    GenerateHuffmanCodes(priorityQueue.top(), "", huffmanCodeMap); ///< Generates Huffman codes starting from the root of the tree.
+    GenerateHuffmanCodes(root, "", huffmanCodeMap); ///< Generates Huffman codes starting from the root of the tree.
 
     ofstream codeFile(outputFileName + ".huff", ios::binary);
     if (!codeFile.is_open()) {
         cerr << "Error: cannot create the code table: " << outputFileName << ".huff" << endl;
+        FreeHuffmanTree(root);
         return false;
     }
     // Numeric byte values let any symbol, including ':', survive the text format.
@@ -130,7 +143,9 @@ bool BuildHuffmanTree(string inputText, const string& outputFileName, priority_q
     string encodedString;
     for (char ch : inputText) encodedString += huffmanCodeMap[ch]; ///< Encodes the input text using the generated Huffman codes.
 
-    return WriteEncodedStringToFile(encodedString, outputFileName);
+    bool result = WriteEncodedStringToFile(encodedString, outputFileName);
+    FreeHuffmanTree(root);
+    return result;
 }
 
 /// @brief Reads the contents of a file into a string.
@@ -257,18 +272,22 @@ bool DecodeFile(const string& encodedFileName, const string& huffFileName, const
 /// @param inputFileName The name of the input file.
 /// @param outputFileName The name of the output file.
 void FileSizeCompress(const string& inputFileName, const string& outputFileName) {
-    if (!fs::exists(inputFileName) || !fs::exists(outputFileName))
+    string tableFileName = outputFileName + ".huff";
+    if (!fs::exists(inputFileName) || !fs::exists(outputFileName) || !fs::exists(tableFileName))
         return;
 
     auto inputSize = fs::file_size(inputFileName);
     auto outputSize = fs::file_size(outputFileName);
+    auto tableSize = fs::file_size(tableFileName);
+    // The code table is required for decompression, so honest numbers count it.
+    auto totalSize = outputSize + tableSize;
 
     cout << "Compression completed!" << endl;
     cout << "Original Size: " << inputSize << " bytes\n";
-    cout << "Compressed Size: " << outputSize << " bytes\n";
+    cout << "Compressed Size: " << outputSize << " bytes (+ " << tableSize << " bytes code table)\n";
 
     if (inputSize > 0) {
-        double compressionPercent = 100.0 * (1 - (double)outputSize / inputSize);
+        double compressionPercent = 100.0 * (1 - (double)totalSize / inputSize);
         cout << "Compression Percentage: " << compressionPercent << "%\n";
     }
 }
@@ -277,18 +296,21 @@ void FileSizeCompress(const string& inputFileName, const string& outputFileName)
 /// @param inputFileName The name of the compressed input file.
 /// @param outputFileName The name of the decompressed output file.
 void FileSizeDecompress(const string& inputFileName, const string& outputFileName) {
-    if (!fs::exists(inputFileName) || !fs::exists(outputFileName))
+    string tableFileName = inputFileName + ".huff";
+    if (!fs::exists(inputFileName) || !fs::exists(outputFileName) || !fs::exists(tableFileName))
         return;
 
     auto inputSize = fs::file_size(inputFileName);
+    auto tableSize = fs::file_size(tableFileName);
     auto outputSize = fs::file_size(outputFileName);
+    auto totalSize = inputSize + tableSize;
 
     cout << "Decompression completed!" << endl;
-    cout << "Compressed Size: " << inputSize << " bytes\n";
+    cout << "Compressed Size: " << inputSize << " bytes (+ " << tableSize << " bytes code table)\n";
     cout << "Decompressed Size: " << outputSize << " bytes\n";
 
-    if (inputSize > 0) {
-        double decompressionIncreasePercent = 100.0 * ((double)outputSize / inputSize - 1);
+    if (totalSize > 0) {
+        double decompressionIncreasePercent = 100.0 * ((double)outputSize / totalSize - 1);
         cout << "Decompression Increase Percentage: " << decompressionIncreasePercent << "%\n";
     }
 }
@@ -311,8 +333,7 @@ int main(int argc, char* argv[]) {
         string text;
         if (!ReadFile(inputFileName, text))
             return 1;
-        priority_queue<TreeNode*, vector<TreeNode*>, CompareNodes> pq;
-        if (!BuildHuffmanTree(text, outputFileName, pq))
+        if (!BuildHuffmanTree(text, outputFileName))
             return 1;
         FileSizeCompress(inputFileName, outputFileName);
     }
