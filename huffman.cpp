@@ -13,7 +13,7 @@ namespace fs = std::filesystem;
 
 namespace huffman {
 
-HuffmanTree::HuffmanTree(const unordered_map<char, unsigned>& frequencies)
+HuffmanTree::HuffmanTree(const std::unordered_map<char, unsigned>& frequencies)
 {
     struct CompareNodes {
         bool operator()(const Node* left, const Node* right) const {
@@ -52,15 +52,15 @@ void HuffmanTree::FreeNodes(Node* node)
     delete node;
 }
 
-unordered_map<char, string> HuffmanTree::BuildCodeTable() const
+std::unordered_map<char, std::string> HuffmanTree::BuildCodeTable() const
 {
     unordered_map<char, string> codes;
     CollectCodes(root, "", codes);
     return codes;
 }
 
-void HuffmanTree::CollectCodes(const Node* node, const string& path,
-                               unordered_map<char, string>& codes)
+void HuffmanTree::CollectCodes(const Node* node, const std::string& path,
+                               std::unordered_map<char, std::string>& codes)
 {
     if (node == nullptr)
         return;
