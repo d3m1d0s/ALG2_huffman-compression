@@ -1,14 +1,14 @@
-#include <iostream> // Standard library for input and output streams.
-#include <fstream> // Library for file stream operations.
-#include <queue> // Library for using the queue data structure.
-#include <unordered_map> // Library for using hash maps.
-#include <cstring> // Library for string manipulation functions.
-#include <sstream> // Library for string stream operations.
-#include <bitset> // Library for bitset operations.
-#include <filesystem> // Library for file size operations.
+#include <iostream>
+#include <fstream>
+#include <queue>
+#include <unordered_map>
+#include <cstring>
+#include <sstream>
+#include <bitset>
+#include <filesystem>
 
-using namespace std; // Using the standard namespace.
-namespace fs = std::filesystem; // Use a namespace alias for simplicity.
+using namespace std;
+namespace fs = std::filesystem;
 
 /// @struct TreeNode
 /// @brief A node structure for Huffman tree.
@@ -21,7 +21,6 @@ struct TreeNode
     unsigned frequency; ///< Frequency of the character.
     TreeNode* left, * right; ///< Pointers to the left and right child nodes.
 
-    // Constructor
     TreeNode(char character, unsigned frequency)
         : character(character), frequency(frequency), left(nullptr), right(nullptr)
     {} ///< Initializes a new node with given character and frequency, left and right pointers are set to nullptr.
@@ -50,8 +49,7 @@ void GenerateHuffmanCodes(TreeNode* root, string str, unordered_map<char, string
         return; ///< Base case: if the root is null, do nothing.
 
     if (!root->left && !root->right)
-        // A single-symbol alphabet makes the root itself a leaf, so its path
-        // is empty; such a symbol still needs a real code to be decodable.
+        // A one-symbol alphabet leaves the root a leaf with an empty path.
         huffmanCodes[root->character] = str.empty() ? "0" : str;
 
     GenerateHuffmanCodes(root->left, str + "0", huffmanCodes); ///< Recursively traverse the left child, appending "0" to the code string.
@@ -69,8 +67,7 @@ bool WriteEncodedStringToFile(const string& encodedString, const string& outputF
         return false;
     }
 
-    // The first byte of the file stores how many filler zero bits
-    // were appended to complete the last data byte (0..7).
+    // The first byte stores how many filler zero bits complete the last data byte (0..7).
     unsigned char padding = (8 - encodedString.size() % 8) % 8;
     outputFile.put(static_cast<char>(padding));
 
@@ -94,10 +91,9 @@ bool BuildHuffmanTree(string inputText, const string& outputFileName, priority_q
     for (char ch : inputText)
         charFrequencyMap[ch]++;
 
-    // An empty input has no alphabet to build a tree from; emit an empty
-    // table and a header-only stream so decompression restores an empty file.
+    // No alphabet to build a tree from; write an empty table and a header-only stream.
     if (charFrequencyMap.empty()) {
-        ofstream codeFile(outputFileName + ".huff");
+        ofstream codeFile(outputFileName + ".huff", ios::binary);
         if (!codeFile.is_open()) {
             cerr << "Error: cannot create the code table: " << outputFileName << ".huff" << endl;
             return false;
@@ -121,13 +117,12 @@ bool BuildHuffmanTree(string inputText, const string& outputFileName, priority_q
     unordered_map<char, string> huffmanCodeMap;
     GenerateHuffmanCodes(priorityQueue.top(), "", huffmanCodeMap); ///< Generates Huffman codes starting from the root of the tree.
 
-    ofstream codeFile(outputFileName + ".huff");
+    ofstream codeFile(outputFileName + ".huff", ios::binary);
     if (!codeFile.is_open()) {
         cerr << "Error: cannot create the code table: " << outputFileName << ".huff" << endl;
         return false;
     }
-    // Symbols are stored as numeric byte values so that any byte,
-    // including ':' and control characters, survives the text format.
+    // Numeric byte values let any symbol, including ':', survive the text format.
     for (const auto& pair : huffmanCodeMap)
         codeFile << static_cast<int>(static_cast<unsigned char>(pair.first)) << ":" << pair.second << "\n";
     codeFile.close();
@@ -143,7 +138,7 @@ bool BuildHuffmanTree(string inputText, const string& outputFileName, priority_q
 /// @param content Receives the contents of the file.
 /// @returns True on success, false if the file cannot be opened.
 bool ReadFile(const string& fileName, string& content) {
-    ifstream file(fileName);
+    ifstream file(fileName, ios::binary);
     if (!file.is_open()) {
         cerr << "Error: cannot open the input file: " << fileName << endl;
         return false;
@@ -184,8 +179,7 @@ void DecodeBinaryFile(const string& encodedFileName, ofstream& outputFile, const
     if (encodedBinaryString.empty())
         return;
 
-    // The first byte stores the number of filler bits in the last data byte;
-    // they are dropped below so they cannot decode into extra symbols.
+    // The first byte is the number of filler bits to drop from the tail.
     unsigned char padding = static_cast<unsigned char>(encodedBinaryString[0]);
 
     string encodedString;
@@ -205,7 +199,7 @@ void DecodeBinaryFile(const string& encodedFileName, ofstream& outputFile, const
 /// @param outputFileName The name of the file to write the decoded data.
 /// @returns True on success, false if any of the files cannot be used.
 bool DecodeFile(const string& encodedFileName, const string& huffFileName, const string& outputFileName) {
-    ifstream codeFile(huffFileName);
+    ifstream codeFile(huffFileName, ios::binary);
     if (!codeFile.is_open()) {
         cerr << "Error: cannot open the code table: " << huffFileName << endl;
         return false;
@@ -213,11 +207,13 @@ bool DecodeFile(const string& encodedFileName, const string& huffFileName, const
     string line;
     unordered_map<string, char> huffmanCodes;
     while (getline(codeFile, line)) {
+        // Tolerate tables that were written with Windows line endings.
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
         if (line.empty())
             continue;
 
-        // Expected line format: <byte value 0..255>:<code made of '0'/'1'>.
-        // Lines that do not match are skipped instead of producing garbage entries.
+        // Line format: <byte value 0..255>:<code of '0'/'1'>; anything else is skipped.
         size_t separator = line.find(':');
         if (separator == string::npos || separator == 0 || separator > 3)
             continue;
@@ -241,14 +237,13 @@ bool DecodeFile(const string& encodedFileName, const string& huffFileName, const
         cerr << "Error: cannot open the compressed file: " << encodedFileName << endl;
         return false;
     }
-    // An empty table is only legitimate for the stream of an empty original
-    // file, which consists of the single padding-size byte.
+    // An empty table is only valid for the one-byte stream of an empty file.
     if (huffmanCodes.empty() && fs::file_size(encodedFileName) > 1) {
         cerr << "Error: no valid entries in the code table: " << huffFileName << endl;
         return false;
     }
 
-    ofstream outputFile(outputFileName);
+    ofstream outputFile(outputFileName, ios::binary);
     if (!outputFile.is_open()) {
         cerr << "Error: cannot create the output file: " << outputFileName << endl;
         return false;
