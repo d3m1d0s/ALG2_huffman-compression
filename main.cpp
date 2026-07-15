@@ -7,9 +7,7 @@
 using namespace std;
 namespace fs = std::filesystem;
 
-/// @brief Calculates and displays the file size before and after compression.
-/// @param inputFileName The name of the input file.
-/// @param outputFileName The name of the output file.
+/// Prints the size summary after compression.
 void FileSizeCompress(const string& inputFileName, const string& outputFileName) {
     string tableFileName = outputFileName + ".huff";
     if (!fs::exists(inputFileName) || !fs::exists(outputFileName) || !fs::exists(tableFileName))
@@ -18,7 +16,7 @@ void FileSizeCompress(const string& inputFileName, const string& outputFileName)
     auto inputSize = fs::file_size(inputFileName);
     auto outputSize = fs::file_size(outputFileName);
     auto tableSize = fs::file_size(tableFileName);
-    // The code table is required for decompression, so honest numbers count it.
+    // The code table is required for decompression, so honest numbers have to count it
     auto totalSize = outputSize + tableSize;
 
     cout << "Compression completed!" << endl;
@@ -31,9 +29,7 @@ void FileSizeCompress(const string& inputFileName, const string& outputFileName)
     }
 }
 
-/// @brief Calculates and displays the file size before and after decompression.
-/// @param inputFileName The name of the compressed input file.
-/// @param outputFileName The name of the decompressed output file.
+/// Prints the size summary after decompression.
 void FileSizeDecompress(const string& inputFileName, const string& outputFileName) {
     string tableFileName = inputFileName + ".huff";
     if (!fs::exists(inputFileName) || !fs::exists(outputFileName) || !fs::exists(tableFileName))
@@ -54,19 +50,15 @@ void FileSizeDecompress(const string& inputFileName, const string& outputFileNam
     }
 }
 
-/// @brief The main function handling command line arguments for compressing or decompressing files.
-/// @param argc Number of command line arguments.
-/// @param argv Array of command line arguments.
-/// @returns Returns 0 on successful execution, or 1 on error.
 int main(int argc, char* argv[]) {
     if (argc != 4) {
-        cerr << "Usage: " << argv[0] << " <action> <input file> <output file>" << endl; ///< Checks for the correct number of arguments and displays usage instructions.
-        return 1; ///< Exits with an error code if the number of arguments is incorrect.
+        cerr << "Usage: " << argv[0] << " <action> <input file> <output file>" << endl;
+        return 1;
     }
 
-    string action = argv[1]; ///< Stores the action ('c' for compress, 'd' for decompress).
-    string inputFileName = argv[2]; ///< Stores the name of the input file.
-    string outputFileName = argv[3]; ///< Stores the name of the output file.
+    string action = argv[1];
+    string inputFileName = argv[2];
+    string outputFileName = argv[3];
 
     if (action == "c") {
         if (!huffman::Compress(inputFileName, outputFileName))
@@ -79,9 +71,9 @@ int main(int argc, char* argv[]) {
         FileSizeDecompress(inputFileName, outputFileName);
     }
     else {
-        cerr << "Invalid action. Use 'c' for compress and 'd' for decompress." << endl; ///< Handles invalid actions.
-        return 1; ///< Exits with an error code for invalid actions.
+        cerr << "Invalid action. Use 'c' for compress and 'd' for decompress." << endl;
+        return 1;
     }
 
-    return 0; ///< Indicates successful execution.
+    return 0;
 }

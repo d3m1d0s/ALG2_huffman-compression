@@ -25,7 +25,7 @@ HuffmanTree::HuffmanTree(const unordered_map<char, unsigned>& frequencies)
     for (const auto& pair : frequencies)
         nodes.push(new Node{pair.first, pair.second, nullptr, nullptr});
 
-    // The two rarest nodes merge first, so frequent symbols end up near the root.
+    // The two rarest nodes merge first, so frequent symbols end up near the root
     while (nodes.size() > 1) {
         Node* left = nodes.top();
         nodes.pop();
@@ -66,7 +66,7 @@ void HuffmanTree::CollectCodes(const Node* node, const string& path,
         return;
 
     if (!node->left && !node->right)
-        // A one-symbol alphabet leaves the root a leaf with an empty path.
+        // A one-symbol alphabet leaves the root a leaf with an empty path
         codes[node->character] = path.empty() ? "0" : path;
 
     CollectCodes(node->left, path + "0", codes);
@@ -95,7 +95,7 @@ bool WriteCodeTable(const unordered_map<char, string>& codes, const string& tabl
         cerr << "Error: cannot create the code table: " << tableFileName << endl;
         return false;
     }
-    // Numeric byte values let any symbol, including ':', survive the text format.
+    // Numeric byte values let any symbol, including ':', survive the text format
     for (const auto& pair : codes)
         codeFile << static_cast<int>(static_cast<unsigned char>(pair.first)) << ":" << pair.second << "\n";
     return true;
@@ -111,13 +111,13 @@ bool ReadCodeTable(const string& tableFileName, unordered_map<string, char>& cod
 
     string line;
     while (getline(codeFile, line)) {
-        // Tolerate tables that were written with Windows line endings.
+        // Tolerate tables that were written with Windows line endings
         if (!line.empty() && line.back() == '\r')
             line.pop_back();
         if (line.empty())
             continue;
 
-        // Line format: <byte value 0..255>:<code of '0'/'1'>; anything else is skipped.
+        // Line format: <byte value 0..255>:<code of '0'/'1'>; anything else is skipped
         size_t separator = line.find(':');
         if (separator == string::npos || separator == 0 || separator > 3)
             continue;
@@ -146,7 +146,7 @@ bool WriteEncodedString(const string& encodedString, const string& outputFileNam
         return false;
     }
 
-    // The first byte stores how many filler zero bits complete the last data byte (0..7).
+    // The first byte stores how many filler zero bits complete the last data byte (0..7)
     unsigned char padding = (8 - encodedString.size() % 8) % 8;
     outputFile.put(static_cast<char>(padding));
 
@@ -181,7 +181,7 @@ void DecodeStream(const string& encodedFileName, ofstream& outputFile, const uno
     if (bytes.empty())
         return;
 
-    // The first byte is the number of filler bits to drop from the tail.
+    // The first byte is the number of filler bits to drop from the tail
     unsigned char padding = static_cast<unsigned char>(bytes[0]);
 
     string bits;
@@ -205,7 +205,7 @@ bool Compress(const string& inputFileName, const string& outputFileName)
     for (char ch : text)
         frequencies[ch]++;
 
-    // No alphabet to build a tree from; write an empty table and a header-only stream.
+    // No alphabet to build a tree from; write an empty table and a header-only stream
     if (frequencies.empty()) {
         if (!WriteCodeTable({}, outputFileName + ".huff"))
             return false;
@@ -237,7 +237,7 @@ bool Decompress(const string& inputFileName, const string& outputFileName)
         cerr << "Error: cannot open the compressed file: " << inputFileName << endl;
         return false;
     }
-    // An empty table is only valid for the one-byte stream of an empty file.
+    // An empty table is only valid for the one-byte stream of an empty file
     if (codes.empty() && fs::file_size(inputFileName) > 1) {
         cerr << "Error: no valid entries in the code table: " << tableFileName << endl;
         return false;
