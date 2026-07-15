@@ -61,14 +61,18 @@ void GenerateHuffmanCodes(TreeNode* root, string str, unordered_map<char, string
 /// @param outputFileName The name of the file to write the encoded data to.
 void WriteEncodedStringToFile(const string& encodedString, const string& outputFileName) {
     ofstream outputFile(outputFileName, ios::binary);
-    bitset<8> bits;
-    stringstream sstream(encodedString);
-    while (sstream.good()) {
-        sstream >> bits; ///< Reads 8 bits at a time from the encoded string.
-        char c = static_cast<char>(bits.to_ulong()); ///< Converts the bitset to an unsigned long and then to a character.
-        outputFile.write(&c, sizeof(c)); ///< Writes the converted character to the output file.
+
+    // The first byte of the file stores how many filler zero bits
+    // were appended to complete the last data byte (0..7).
+    unsigned char padding = (8 - encodedString.size() % 8) % 8;
+    outputFile.put(static_cast<char>(padding));
+
+    for (size_t i = 0; i < encodedString.size(); i += 8) {
+        string byteBits = encodedString.substr(i, 8);
+        byteBits.append(8 - byteBits.size(), '0');
+        outputFile.put(static_cast<char>(bitset<8>(byteBits).to_ulong()));
     }
-    outputFile.close(); ///< Closes the file stream.
+    outputFile.close();
 }
 
 /// @brief Builds the Huffman tree from the input text.
@@ -152,12 +156,21 @@ void DecodeBinaryFile(const string& encodedFileName, ofstream& outputFile, const
     string encodedBinaryString = sstream.str(); ///< Converts the string stream to a string.
     inputFile.close(); ///< Closes the input file stream.
 
+    if (encodedBinaryString.empty())
+        return;
+
+    // The first byte stores the number of filler bits in the last data byte;
+    // they are dropped below so they cannot decode into extra symbols.
+    unsigned char padding = static_cast<unsigned char>(encodedBinaryString[0]);
+
     string encodedString;
-    for (unsigned char byte : encodedBinaryString)
+    for (size_t i = 1; i < encodedBinaryString.size(); ++i)
     {
-        bitset<8> bits(byte); ///< Converts each byte to a bitset of 8 bits.
-        encodedString += bits.to_string(); ///< Converts the bitset to a string and appends it to the encoded string.
+        bitset<8> bits(static_cast<unsigned char>(encodedBinaryString[i]));
+        encodedString += bits.to_string();
     }
+    if (padding <= encodedString.size())
+        encodedString.resize(encodedString.size() - padding);
     Decode(encodedString, outputFile, huffmanCodes); ///< Decodes the encoded string and writes it to the output file.
 }
 
