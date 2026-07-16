@@ -52,7 +52,7 @@ void FileSizeDecompress(const string& inputFileName, const string& outputFileNam
 
 int main(int argc, char* argv[]) {
     if (argc != 4) {
-        cerr << "Usage: " << argv[0] << " <action> <input file> <output file>" << endl;
+        cerr << "Usage: " << argv[0] << " <c|d> <input> <output>" << endl;
         return 1;
     }
 

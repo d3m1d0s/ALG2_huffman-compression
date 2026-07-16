@@ -1,105 +1,53 @@
-# Huffman Compression Algorithm
+# Huffman Compressor
 
-This project implements a classic **Huffman Coding** compression algorithm in C++.  
-It was developed as part of the *Algorithms II* course at **VSB – Technical University of Ostrava**.
+## Overview
+This is a command-line file compressor based on Huffman coding, made as a
+semester project for the Algorithms II course at VSB-TUO. It compresses a
+file into a binary file plus a text file with the Huffman codes, and
+decompresses them back into the original.
 
-The application performs lossless text compression by building a binary Huffman tree based on character frequencies, storing compressed data in a binary format, and then decompressing it back.
+## Build
+To build the program, ensure CMake 3.16 or newer and a C++20 compiler are
+installed and run:
 
----
+    mkdir build && cd build
+    cmake ..
+    make
 
-## Features
+This produces an executable named `HuffmanCompressor`. The project can also
+be opened directly in CLion.
 
-- Lossless text compression with Huffman coding
-- Frequency analysis of input characters
-- Huffman tree construction and traversal
-- Bit-level file compression and decompression
-- Binary output format
-- CLI interface
-- CMake support
-- Doxygen documentation ready
+## Usage
+Run the program from the project root:
 
----
+    ./build/HuffmanCompressor <c|d> <input> <output>
 
-## Project Structure
+- `c` - compress `<input>` into `<output>`
+- `d` - decompress `<input>` into `<output>`
 
-```
+Compression also creates `<output>.huff` with the code of every byte.
+Decompression looks for `<input>.huff` next to the compressed file, so
+keep the two files together. After each run the program prints the sizes
+before and after.
 
-huffman-compression
-├── main.cpp                 # Main implementation file
-├── input.txt                # Example text input
-├── output.txt               # Decompressed output
-├── compressed.bin           # Compressed file
-├── compressed.bin.huff      # Huffman-coded binary file
-├── CMakeLists.txt           # CMake build script
-├── Doxyfile                 # Doxygen config
+Example:
 
-````
+    ./build/HuffmanCompressor c input.txt compressed.bin
+    ./build/HuffmanCompressor d compressed.bin output.txt
 
----
+The included `input.txt` is "The Gold-Bug" by Edgar Allan Poe. To make sure
+the decompressed file matches the original, compare them with
+`cmp input.txt output.txt` on Linux or `fc /b input.txt output.txt` on
+Windows.
 
-## Build Instructions
-
-Make sure you have CMake and a C++ compiler installed:
-
-```bash
-git clone https://github.com/your-username/huffman-compression.git
-cd huffman-compression
-mkdir build && cd build
-cmake ..
-make
-````
-
----
-
-## Usage Example
-
-To compress a file:
-
-```bash
-./huffman-compression input.txt compressed.bin
-```
-
-To decompress:
-
-```bash
-./huffman-compression compressed.bin output.txt
-```
-
----
-
-## Algorithm Overview
-
-Huffman coding is a **greedy algorithm** used for data compression. It assigns shorter binary codes to more frequent characters and longer codes to less frequent ones, reducing the overall data size without loss.
-
-Steps:
-
-1. Analyze character frequency in the input.
-2. Build a binary tree with minimum-weight nodes merged iteratively.
-3. Generate binary codes by traversing the tree.
-4. Encode the file using generated codes and store compressed output.
-
----
-
-## Academic Context
-
-This project was developed for the **Algorithms II** course (*ALG2*)
-Faculty of Electrical Engineering and Computer Science
-**VSB – Technical University of Ostrava**
-
-It demonstrates practical skills in:
-
-* Tree and priority queue data structures
-* Bitwise operations
-* File I/O in C++
-* Efficient algorithmic design
-
----
+## Documentation
+Run `doxygen` in the project root to generate the documentation into
+`docs/`. It is also available at
+https://d3m1d0s.github.io/ALG2_huffman-compression/.
 
 ## License
+This project is authored by Demid Ostiakov. All rights reserved.
 
-This project is for educational purposes only.
-
----
-
-> “Programs must be written for people to read, and only incidentally for machines to execute.”
->  Harold Abelson    
+## Acknowledgments
+Thanks to doc. Mgr. Jiří Dvorský, Ph.D. from VSB-TUO, whose Algorithms
+lectures gave me the understanding this project is built on.
